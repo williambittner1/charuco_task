@@ -7,19 +7,18 @@ import os
 
 # for charuco_watch.mov use e.g. DICT_5X5_100, DICT_5X5_250 or DICT_5X5_1000, 
 # but correct square_length and marker_length unknown (thus no board pose estimation possible -> interpolateCornersCharuco fails)
-ARUCO_DICT = cv2.aruco.DICT_5X5_250 
+# ARUCO_DICT = cv2.aruco.DICT_5X5_250
 
 # for data captured by William
-# ARUCO_DICT = cv2.aruco.DICT_6X6_250 
-SQUARES_VERTICALLY = 7 
+ARUCO_DICT = cv2.aruco.DICT_6X6_250 
+
+SQUARES_VERTICALLY = 7
 SQUARES_HORIZONTALLY = 5
 SQUARE_LENGTH = 0.03
 MARKER_LENGTH = 0.015
 
 # Input source path
-# INPUT_SOURCE = "videos/charuco_watch.mov"
-# INPUT_SOURCE = "videos/VID20250520163143.mp4"
-INPUT_SOURCE = "data/charuco_watch.mov" 
+INPUT_SOURCE = "data/occlusion/VID20250521125656.mp4" 
 
 USE_CALIBRATION = True
 
