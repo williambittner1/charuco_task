@@ -1,0 +1,179 @@
+import cv2
+import numpy as np
+import time
+import os
+
+# Parameters (should match the 1 generation script)
+
+# for charuco_watch.mov use e.g. DICT_5X5_100, DICT_5X5_250 or DICT_5X5_1000, 
+# but correct square_length and marker_length unknown (thus no board pose estimation possible -> interpolateCornersCharuco fails)
+ARUCO_DICT = cv2.aruco.DICT_5X5_250 
+
+# for data captured by William
+# ARUCO_DICT = cv2.aruco.DICT_6X6_250 
+SQUARES_VERTICALLY = 7 
+SQUARES_HORIZONTALLY = 5
+SQUARE_LENGTH = 0.03
+MARKER_LENGTH = 0.015
+
+# Input source path
+# INPUT_SOURCE = "videos/charuco_watch.mov"
+# INPUT_SOURCE = "videos/VID20250520163143.mp4"
+INPUT_SOURCE = "data/charuco_watch.mov" 
+
+USE_CALIBRATION = True
+
+# William's Oneplus 12 Smartphone
+CAMERA_MATRIX = np.array([
+    [2831.81, 0.00, 2049.37],
+    [0.00, 2776.26, 1468.23],
+    [0.00, 0.00, 1.00]
+])
+
+DIST_COEFFS = np.array([0.360103, -3.711869, 0.000724, -0.002625, 11.356215])
+
+def setup_charuco_board():
+    """Initialize the ChArUco board with the same parameters used for generation."""
+    dictionary = cv2.aruco.getPredefinedDictionary(ARUCO_DICT)
+    board = cv2.aruco.CharucoBoard((SQUARES_VERTICALLY, SQUARES_HORIZONTALLY), 
+                                 SQUARE_LENGTH, MARKER_LENGTH, dictionary)
+    return board, dictionary
+
+
+
+def detect_charuco(frame, board, dictionary, camera_matrix, dist_coeffs, use_calibration):
+    """Detect ChArUco markers with camera calibration and pose estimation."""
+    image_copy = frame.copy()
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    
+    # Detect ArUco markers
+    aruco_params = cv2.aruco.DetectorParameters()
+    aruco_params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_CONTOUR
+    detector = cv2.aruco.ArucoDetector(dictionary, aruco_params)
+    corners, ids, rejected = detector.detectMarkers(gray)
+    
+    # Debug information
+    print(f"Number of markers detected: {len(corners) if corners is not None else 0}")        
+    print(f"Marker IDs detected: {ids.flatten() if ids is not None else 0}")
+    
+    if ids is not None and len(ids) > 0:
+        # Draw detected/rejected markers
+        cv2.aruco.drawDetectedMarkers(image_copy, corners, ids)
+        # if rejected is not None and len(rejected) > 0:
+        #     cv2.aruco.drawDetectedMarkers(image_copy, rejected, None, (0, 0, 255))
+        
+        # Detect ChArUco corners
+        if use_calibration:
+            retval, charuco_corners, charuco_ids = cv2.aruco.interpolateCornersCharuco(
+                corners, ids, frame, board,
+                cameraMatrix=camera_matrix,
+                distCoeffs=dist_coeffs)
+        else:
+            retval, charuco_corners, charuco_ids = cv2.aruco.interpolateCornersCharuco(
+                corners, ids, frame, board)
+        
+        # Debug information
+        print(f"Number of ChArUco corners detected: {retval}")
+        print(f"ChArUco corner IDs: {charuco_ids.flatten() if charuco_ids is not None else 0}")
+        
+        if use_calibration:
+            if retval > 0 and charuco_ids is not None and len(charuco_ids) > 0:
+                # Draw detected ChArUco corners
+                cv2.aruco.drawDetectedCornersCharuco(image_copy, charuco_corners, charuco_ids, (255, 0, 0))
+                
+                # Initialize rotation and translation vectors
+                rvec = np.zeros(3, dtype=np.float32)
+                tvec = np.zeros(3, dtype=np.float32)
+                
+                # Estimate pose
+                valid = cv2.aruco.estimatePoseCharucoBoard(
+                    charuco_corners, charuco_ids, board, camera_matrix, dist_coeffs, rvec, tvec)
+                
+                if valid:
+                    # Draw coordinate axes
+                    cv2.drawFrameAxes(image_copy, camera_matrix, dist_coeffs, rvec, tvec, 0.1)
+                    print(f"Translation: {tvec.flatten()}")
+                    print(f"Rotation (degrees): {np.degrees(rvec.flatten())}")
+    
+    return image_copy
+
+
+
+def process_image(image_path, board, dictionary, use_calibration=False):
+    """Process a single image."""
+    frame = cv2.imread(image_path)
+    if frame is None:
+        print(f"Error: Could not read image from {image_path}")
+        return
+        
+    frame = detect_charuco(frame, board, dictionary, CAMERA_MATRIX, DIST_COEFFS, use_calibration)
+    
+    
+    # Display the frame
+    cv2.imshow("ChArUco Detection", frame)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+
+def process_video(video_path, board, dictionary, use_calibration=False):
+    """Process a video file."""
+    cap = cv2.VideoCapture(video_path)
+    
+    if not cap.isOpened():
+        print(f"Error: Could not open video file: {video_path}")
+        return
+    
+    # Get video properties
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    print(f"Video properties: {width}x{height} @ {fps}fps")
+    
+    frame_count = 0
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            print("End of video stream")
+            break
+        
+        frame_count += 1
+        print(f"\nProcessing frame {frame_count}")
+        
+        # Detect ChArUco markers
+        frame = detect_charuco(frame, board, dictionary, CAMERA_MATRIX, DIST_COEFFS, use_calibration)
+        
+        # Display the frame
+        cv2.imshow("ChArUco Detection", frame)
+        
+        # Break loop on 'q' press
+        if cv2.waitKey(30) & 0xFF == ord('q'):
+            break
+    
+    cap.release()
+    cv2.destroyAllWindows()
+
+def main():
+    # Setup ChArUco board
+    board, dictionary = setup_charuco_board()
+    
+    # Get absolute path of the input source
+    input_path = os.path.abspath(INPUT_SOURCE)
+    
+    # Check if file exists
+    if not os.path.isfile(input_path):
+        print(f"Error: File not found: {input_path}")
+        return
+    
+    # Check file extension
+    ext = os.path.splitext(input_path)[1].lower()
+    if ext in ['.jpg', '.jpeg', '.png', '.bmp']:
+        print(f"Processing image: {input_path}")
+        process_image(input_path, board, dictionary, USE_CALIBRATION)
+    elif ext in ['.mp4', '.avi', '.mov']:
+        print(f"Processing video: {input_path}")
+        process_video(input_path, board, dictionary, USE_CALIBRATION)
+    else:
+        print(f"Unsupported file format: {ext}")
+
+if __name__ == "__main__":
+    main()
