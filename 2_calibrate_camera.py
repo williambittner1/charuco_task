@@ -7,10 +7,11 @@ import os
 ARUCO_DICT = cv2.aruco.DICT_6X6_250
 SQUARES_VERTICALLY = 7
 SQUARES_HORIZONTALLY = 5
-SQUARE_LENGTH = 0.04
-MARKER_LENGTH = 0.02
+SQUARE_LENGTH = 0.03
+MARKER_LENGTH = 0.015
 
-CALIBRATION_FOLDER = 'data/calibration'
+# Set the calibration folder to the video frames or images
+CALIBRATION_FOLDER = 'data/calibration_video'
 
 def setup_charuco_board():
     """Initialize the ChArUco board with the same parameters used for generation."""

@@ -70,4 +70,5 @@ You can adjust the following parameters in the scripts:
 - Choose correct Board ARUCO_DICT (e.g. 6X6_250). Otherwise, if the wrong board setup is being used during detection stage, the detection won't work
 - Interpolate Charuco Corners needs correct/exact board parameters: e.g. SQUARE_LENGTH = 0.03, MARKER_LENGTH = 0.015 otherwise the corners won't get interpolated and no board pose gets predicted
 - Problems with strong Motion Blur
-- Pose Estimation is less accurate for videos than for images for some reason
+- Pose Estimation is less accurate for videos than for images for some reason (Found the reason: Camera model needs to be recalibrated on video frames due to different resolution)
+- To improve robustness, changing of scale can help 

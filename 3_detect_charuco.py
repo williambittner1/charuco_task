@@ -18,18 +18,25 @@ SQUARE_LENGTH = 0.03
 MARKER_LENGTH = 0.015
 
 # Input source path
-INPUT_SOURCE = "data/occlusion/VID20250521125656.mp4" 
+INPUT_SOURCE = "data/clean/VID20250521123919.mp4" 
 
 USE_CALIBRATION = True
 
-# William's Oneplus 12 Smartphone
+# William's Oneplus 12 Smartphone (Photos)
+# DIST_COEFFS = np.array([0.360103, -3.711869, 0.000724, -0.002625, 11.356215])
+# CAMERA_MATRIX = np.array([
+#     [2831.81, 0.00, 2049.37],
+#     [0.00, 2776.26, 1468.23],
+#     [0.00, 0.00, 1.00]
+# ])
+
+# William's Oneplus 12 Smartphone (Video)
+DIST_COEFFS = np.array([0.067710, -0.643980, 0.000172, 0.000833, -0.935000])
 CAMERA_MATRIX = np.array([
-    [2831.81, 0.00, 2049.37],
-    [0.00, 2776.26, 1468.23],
+    [3360.11, 0.00, 1934.39],
+    [0.00, 3297.00, 893.22],
     [0.00, 0.00, 1.00]
 ])
-
-DIST_COEFFS = np.array([0.360103, -3.711869, 0.000724, -0.002625, 11.356215])
 
 def setup_charuco_board():
     """Initialize the ChArUco board with the same parameters used for generation."""
@@ -42,12 +49,49 @@ def setup_charuco_board():
 
 def detect_charuco(frame, board, dictionary, camera_matrix, dist_coeffs, use_calibration):
     """Detect ChArUco markers with camera calibration and pose estimation."""
+    # Scale down the frame to 50%
+    scale_percent = 100
+    width = int(frame.shape[1] * scale_percent / 100)
+    height = int(frame.shape[0] * scale_percent / 100)
+    dim = (width, height)
+    frame = cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
+
     image_copy = frame.copy()
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     
     # Detect ArUco markers
     aruco_params = cv2.aruco.DetectorParameters()
-    aruco_params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_CONTOUR
+    # Use subpixel refinement for more accurate corner detection
+    aruco_params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
+    
+    # Parameters for adaptive thresholding (used to binarize the image)
+    # Increased window sizes and constant for better handling of motion blur
+    aruco_params.adaptiveThreshWinSizeMin = 3
+    aruco_params.adaptiveThreshWinSizeMax = 70  # Increased from 45 for better blur handling
+    aruco_params.adaptiveThreshWinSizeStep = 5
+    aruco_params.adaptiveThreshConstant = 9  # Increased from 7 for better contrast handling
+    
+    # Parameters for marker detection
+    # Slightly relaxed parameters for motion blur
+    aruco_params.minMarkerPerimeterRate = 0.08  # Slightly decreased from 0.1
+    aruco_params.maxMarkerPerimeterRate = 2.0
+    aruco_params.polygonalApproxAccuracyRate = 0.03  # Slightly increased from 0.02
+    aruco_params.minCornerDistanceRate = 0.1
+    aruco_params.minMarkerDistanceRate = 0.1
+    aruco_params.minDistanceToBorder = 3
+    
+    # Parameters for marker quality
+    # Reduced contrast requirements for motion blur
+    aruco_params.minOtsuStdDev = 3.5  # Decreased from 5.0
+    # Increased cell size for better blur handling
+    aruco_params.perspectiveRemovePixelPerCell = 6  # Increased from 4
+    aruco_params.perspectiveRemoveIgnoredMarginPerCell = 0.13
+    
+    # Parameters for error correction
+    # Increased error tolerance for motion blur
+    aruco_params.maxErroneousBitsInBorderRate = 0.4  # Increased from 0.35
+    aruco_params.errorCorrectionRate = 0.75  # Increased from 0.6
+
     detector = cv2.aruco.ArucoDetector(dictionary, aruco_params)
     corners, ids, rejected = detector.detectMarkers(gray)
     
